@@ -2,37 +2,23 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import List
 import pandas as pd
+from datetime import datetime, timedelta
 
-def objects_to_df(model, fields=None, exclude=None, date_cols=None, **kwargs):
-    """
-    Return a pandas dataframe containing the records in a model
-    ``fields`` is an optional list of field names. If provided, return only the
-    named.
-    ``exclude`` is an optional list of field names. If provided, exclude the
-    named from the returned dict, even if they are listed in the ``fields``
-    argument.
-    ``date_cols`` chart.js doesn't currently handle dates very well so these
-    columns need to be converted to a string. Pass in the strftime string 
-    that would work best as the first value followed by the column names.
-    ex:  ['%Y-%m', 'dat_col1', 'date_col2']
-    ``kwargs`` can be include to limit the model query to specific records
-    """
-    
-    if not fields:
-        fields = [field.name for field in model._meta.get_fields()]
 
-    if exclude:
-        fields = [field for field in fields if field not in exclude]
-
-    records = model.objects.filter(**kwargs).values_list(*fields)
-    df = pd.DataFrame(list(records), columns=fields)
-
-    if date_cols:
-        strftime = date_cols.pop(0)
-        for date_col in date_cols:
-            df[date_col] = df[date_col].apply(lambda x: x.strftime(strftime))
-    
+# My functions
+def load_data(file):
+    df = pd.read_csv(file)
+    df['Date'] = pd.to_datetime(df['Date'], format="%H:%M:%S %d.%m.%Y")
     return df
+
+def average_power(df, column):
+    return df[column].mean()
+
+def max_power(df, column):
+    return df[column].max()
+
+def last_power(df, column):
+    return df[column].iat[-1]
 
 def get_options():
     """
@@ -114,21 +100,24 @@ class Chart:
             get_random_colors(num=len(values), colors=self.palette)
 
         # build the datasets
+
         for i in range(len(stacks)):
             self.datasets.append(
                 {
                     'label': stacks[i],
-                    'backgroundColor': self.palette[i],
+                    #'backgroundColor': self.palette[i],
+                    #'borderColor': '#6f42c1',
                     'data': values[i],
+                    'fill': 'false',
                 }
             )
 
-        if len(values) == 1:
-            self.datasets[0]['backgroundColor'] = self.palette
+        #if len(values) == 1:
+        #    self.datasets[0]['backgroundColor'] = self.palette
 
         self.labels = labels
 
-    def from_df(self, df, values, labels, stacks=None, aggfunc=np.sum, round_values=0, fill_value=0):
+    def from_df(self, df, values, labels, stacks=None, aggfunc=np.sum, round_values=0, fill_value=0, last_hours=None, rolling=None):
         """
         function to build a chart from a dataframe
         ``df`` is the datframe to use
@@ -140,19 +129,25 @@ class Chart:
         ``round_values`` the decimal place to round values to
         ``fill_value`` is what to use for empty values
         """
+        if last_hours:
+            df = df[df['Date'] > datetime.now() - timedelta(hours=last_hours)]
+        
+        #if rolling:
+        #    df = df.Date.rolling("120s").mean()
+        
         pivot = pd.pivot_table(
             df,
             values=values,
             index=stacks,
             columns=labels,
-            aggfunc=aggfunc,
-            fill_value=0
+            #aggfunc=aggfunc,
+            fill_value=0.0
         )
 
         pivot = pivot.round(round_values)
 
         values = pivot.values.tolist()
-        labels = pivot.columns.tolist()
+        labels = [d.strftime("%H:%M:%S %d.%m.%Y") for d in pivot.columns.tolist()]
         stacks = pivot.index.tolist()
 
         self.from_lists(values, labels, stacks)
@@ -218,7 +213,7 @@ class Chart:
                             }
                         ]
                     }
-        
+
         if self.chart_type == 'horizontalBar':
             elements['type'] = 'horizontalBar'
             self.options['scales'] = {
@@ -243,7 +238,7 @@ class Chart:
             self.options['scales'] = {
                         'xAxes': [
                             {'stacked': 'true'}
-                        ], 
+                        ],
                         'yAxes': [
                             {'stacked': 'true'}
                         ]
@@ -251,15 +246,18 @@ class Chart:
 
         if self.chart_type == 'doughnut':
             elements['type'] = 'doughnut'
-        
+
         if self.chart_type == 'polarArea':
             elements['type'] = 'polarArea'
-        
+
         if self.chart_type == 'radar':
             elements['type'] = 'radar'
 
+        if self.chart_type == 'line':
+            elements['type'] = 'line'
+
         return elements
-    
+
     def get_html(self):
         code = f'<canvas id="{self.chart_id}"></canvas>'
         return code

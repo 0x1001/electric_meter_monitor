@@ -5,6 +5,13 @@
         <div class="row mb-4 mt-4">
             <div class="col"
                 <div class="card-deck">
+					<div class="card">
+						<div class="card-body">
+						<p>Current power [W]: {{current_power|floatformat:0}}</p>
+						<p>Avrage power [W]: {{avergage_power|floatformat:0}}</p>
+						<p>Max power [W]: {{max_power|floatformat:0}}</p>
+						</div>
+					</div>
                     {% for chart in charts %}
                         <div class="card">
                             <div class="card-body">
