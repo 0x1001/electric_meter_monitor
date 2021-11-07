@@ -11,6 +11,30 @@ def load_data(file):
     df['Date'] = pd.to_datetime(df['Date'], format="%H:%M:%S %d.%m.%Y")
     return df
 
+def history(df, hours=None):
+    if hours is None:
+        return reduce_data(df)
+    else:
+        return reduce_data(df[df['Date'] > datetime.now() - timedelta(hours=hours)])
+
+def reduce_data(df):
+    if len(df) > 300:
+        nth = round(len(df)/300)
+        df = df.iloc[::nth, :].copy(deep=True)
+        
+        last_energy = None
+        last_time = None
+        for i, row in df.iterrows():
+            if last_energy is None and last_time is None:
+                last_energy = df.loc[i,'Total Energy [kWh]']
+                last_time = df.loc[i,'Date']
+            else:
+                df.loc[i,'Current Power [W]'] = ((df.loc[i,'Total Energy [kWh]'] - last_energy) / ((df.loc[i,'Date'] - last_time).total_seconds()/(60*60))) * 1000
+                last_energy = df.loc[i,'Total Energy [kWh]']
+                last_time = df.loc[i,'Date']
+
+    return df
+
 def average_power(df, column):
     return df[column].mean()
 
@@ -81,7 +105,7 @@ class Chart:
     chart_id: str = field(default_factory=generate_chart_id)
     palette: List = field(default_factory=get_colors)
     options: dict = field(default_factory=get_options)
-    def from_lists(self, values, labels, stacks):
+    def from_lists(self, values, labels, stacks, title):
         """
         function to build a chart from lists
         ``values`` is a list of datasets. If the chart is not stacked
@@ -104,9 +128,9 @@ class Chart:
         for i in range(len(stacks)):
             self.datasets.append(
                 {
-                    'label': stacks[i],
-                    #'backgroundColor': self.palette[i],
-                    #'borderColor': '#6f42c1',
+                    'label': title if title else stacks[i],
+                    'backgroundColor': self.palette[i],
+                    'borderColor': self.palette[i],
                     'data': values[i],
                     'fill': 'false',
                 }
@@ -117,7 +141,7 @@ class Chart:
 
         self.labels = labels
 
-    def from_df(self, df, values, labels, stacks=None, aggfunc=np.sum, round_values=0, fill_value=0, last_hours=None, rolling=None):
+    def from_df(self, df, values, labels, stacks=None, aggfunc=np.sum, round_values=0, fill_value=0, title=None):
         """
         function to build a chart from a dataframe
         ``df`` is the datframe to use
@@ -128,13 +152,7 @@ class Chart:
          aggregate the values.  Defaults to np.sum
         ``round_values`` the decimal place to round values to
         ``fill_value`` is what to use for empty values
-        """
-        if last_hours:
-            df = df[df['Date'] > datetime.now() - timedelta(hours=last_hours)]
-        
-        #if rolling:
-        #    df = df.Date.rolling("120s").mean()
-        
+        """       
         pivot = pd.pivot_table(
             df,
             values=values,
@@ -150,7 +168,7 @@ class Chart:
         labels = [d.strftime("%H:%M:%S %d.%m.%Y") for d in pivot.columns.tolist()]
         stacks = pivot.index.tolist()
 
-        self.from_lists(values, labels, stacks)
+        self.from_lists(values, labels, stacks, title)
 
     def get_elements(self):
         """

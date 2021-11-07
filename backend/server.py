@@ -7,27 +7,42 @@ import os
 file_path = "/home/pi/gitwork/electric_meter_web/electric_meter/data/meter_data.csv"
 meter_device = '/dev/ttyUSB0'
 
-def get_reading():
-    CMD = b'/?!\x0D\x0A'
+class Meter:
+    def __init__(self):
+        self.last_energy_value = None
+        self.last_time = None
+        
+    def get_reading(self):
+        CMD = b'/?!\x0D\x0A'
 
-    ser = serial.Serial(meter_device, baudrate=300, bytesize=serial.SEVENBITS, parity=serial.PARITY_EVEN, stopbits=serial.STOPBITS_ONE, timeout=5)
+        ser = serial.Serial(meter_device, baudrate=300, bytesize=serial.SEVENBITS, parity=serial.PARITY_EVEN, stopbits=serial.STOPBITS_ONE, timeout=6)
 
-    first = datetime.now()
-    ser.write(CMD)
-    energy_1 = _parse_meter_reading(ser.readlines())  # unit kWh
+        read_time = datetime.now()
+        ser.write(CMD)
+        energy_value = _parse_meter_reading(ser.readlines())  # unit kWh
 
-    second = datetime.now()
-    ser.write(CMD)
-    energy_2 = _parse_meter_reading(ser.readlines())  # unit kWh
-    
-    power = ((energy_2 - energy_1) / ((second - first).total_seconds()/(60*60))) * 1000  # unit W
-
-    ser.close()
-    
-    if energy_1 and energy_2:
-        return energy_2, power
-    else:
-        return 0, 0
+        if self.last_energy_value is None:
+            print("First reading..")
+            self.last_energy_value = energy_value
+            self.last_time = read_time
+            
+            read_time = datetime.now()
+            ser.write(CMD)
+            energy_value = _parse_meter_reading(ser.readlines())  # unit kWh
+        
+        power = ((energy_value - self.last_energy_value) / ((read_time - self.last_time).total_seconds()/(60*60))) * 1000  # unit W
+        
+        self.last_energy_value = energy_value
+        self.last_time = read_time
+        
+        ser.close()
+        
+        if self.last_energy_value and energy_value:
+            return energy_value, power
+        else:
+            self.last_energy_value = None
+            self.last_time = None
+            return 0, 0
 
 def _parse_meter_reading(data):
     for line in data:
@@ -49,13 +64,18 @@ def write_csv(energy, power):
 
 
 def main():
+    meter = Meter()
+    
     while True:
-        energy, power = get_reading()
+        energy, power = meter.get_reading()
         if energy:
             print("{0} - Total Energy: {1:.3f} kWh, Current Power: {2:.2f} W".format(datetime.now().strftime("%H:%M:%S %d.%m.%Y"), energy, power))
             write_csv(energy, power)
         else:
-            pass  # in case energy is 0, don't log and continue reading
+            print("No data :(")
+            # in case energy is 0, don't log and continue reading
+        
+        time.sleep(30)
 
         
 if __name__ == "__main__":
