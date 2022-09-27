@@ -15,11 +15,12 @@ def history(df, hours=None):
     if hours is None:
         return reduce_data(df)
     else:
-        return reduce_data(df[df['Date'] > datetime.now() - timedelta(hours=hours)])
+        return reduce_data(df[df['Date'] > df['Date'].iloc[-1] - timedelta(hours=hours)])
 
 def reduce_data(df):
-    if len(df) > 300:
-        nth = round(len(df)/300)
+    max_samples = 200
+    if len(df) > max_samples:
+        nth = round(len(df)/max_samples)
         df = df.iloc[::nth, :].copy(deep=True)
         
         last_energy = None
@@ -36,7 +37,8 @@ def reduce_data(df):
     return df
 
 def average_power(df, column):
-    return df[column].mean()
+    #return df[column].mean()
+    return ((df['Total Energy [kWh]'].iloc[0] - df['Total Energy [kWh]'].iloc[-1]) / ((df['Date'].iloc[0] - df['Date'].iloc[-1]).total_seconds()/(60*60))) * 1000
 
 def max_power(df, column):
     return df[column].max()

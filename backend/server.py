@@ -67,7 +67,12 @@ def main():
     meter = Meter()
     
     while True:
-        energy, power = meter.get_reading()
+        try:
+            energy, power = meter.get_reading()
+        except Exception as error:
+            print("Unexpected error while reading meter: {0}".format(error))
+            energy = None
+
         if energy:
             print("{0} - Total Energy: {1:.3f} kWh, Current Power: {2:.2f} W".format(datetime.now().strftime("%H:%M:%S %d.%m.%Y"), energy, power))
             write_csv(energy, power)

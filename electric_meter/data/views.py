@@ -24,14 +24,14 @@ class Dashboard(TemplateView):
         context['max_power'] = max_power(df, 'Current Power [W]')
         context['current_power'] = last_power(df, 'Current Power [W]')
 
-        df_reduced = history(df, hours=2)
+        df_reduced = history(df, hours=4)
 
         current_power = Chart('line', chart_id='current_power', palette=['#9E4770'])
-        current_power.from_df(df_reduced, values='Current Power [W]', labels=['Date'], round_values=0, title='Power [W] - Last 2h')
+        current_power.from_df(df_reduced, values='Current Power [W]', labels=['Date'], round_values=0, title='Power [W] - Last 4h')
         context['charts'].append(current_power.get_presentation())
 
         total_energy = Chart('line', chart_id='total_energy', palette=['#631D76'])
-        total_energy.from_df(df_reduced, values='Total Energy [kWh]', labels=['Date'], round_values=3, title='Energy [kWh] - Last 2h')
+        total_energy.from_df(df_reduced, values='Total Energy [kWh]', labels=['Date'], round_values=3, title='Energy [kWh] - Last 4h')
         context['charts'].append(total_energy.get_presentation())
 
         df_reduced = history(df, hours=24)
